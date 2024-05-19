@@ -1,0 +1,58 @@
+# Notes DynamoDB table
+# ? https://docs.aws.amazon.com/es_es/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html
+notesTable:
+  Type: AWS::DynamoDB::Table
+  Properties:
+    AttributeDefinitions:
+      - AttributeName: note_id
+        AttributeType: S 
+    BillingMode: PAY_PER_REQUEST
+    KeySchema:
+      - AttributeName: note_id
+        KeyType: HASH
+    TableName: notes-${self:provider.stage}
+
+# Cognito User Pool
+# ? https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpool.html
+cognitoUserPool:
+  Type: AWS::Cognito::UserPool
+  Properties:
+    UserPoolName: MyNotesUP-${self:provider.stage}
+
+# User Pool Web Client
+# ? https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpoolclient.html
+cognitoUserPoolClient:
+  Type: AWS::Cognito::UserPoolClient
+  Properties:
+    ClientName: MyNotesUPClient
+    UserPoolId: !Ref cognitoUserPool
+    AllowedOAuthFlowsUserPoolClient: true
+    AllowedOAuthScopes:
+      - phone
+      - email
+      - profile
+      - openid
+    AllowedOAuthFlows:
+      - implicit 
+    CallbackURLs:
+      - http://localhost:3000
+    SupportedIdentityProviders: 
+      - COGNITO
+
+# User Pool Domain
+# ? https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooldomain.html
+cognitoUserPoolDomain:
+  Type: AWS::Cognito::UserPoolDomain
+  Properties:      
+    Domain: mynotescogdom-${self:provider.stage}
+    UserPoolId: !Ref cognitoUserPool
+
+# Application Paramaters
+# ? https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ssm-parameter.html
+userPoolArnParam:
+  Type: AWS::SSM::Parameter
+  Properties:
+    Name: /notes/${self:provider.stage}/userpoolArn
+    Type: String
+    Value: !GetAtt cognitoUserPool.Arn
+

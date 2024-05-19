@@ -1,0 +1,110 @@
+service: aws-crud-rest-api
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev'} # This is the stage that will be used to construct the name of the resources, with a default value of 'dev'
+  region: us-west-2
+
+## Cloud Formation
+resources:
+  Resources:
+    ${file(resources.yml)}
+
+## Plugins
+# ? https://www.serverless.com/plugins/serverless-iam-roles-per-function
+plugins:
+  - serverless-iam-roles-per-function
+
+## Lambda functions
+functions:
+  authorizer:
+    handler: authorizer.handler
+    environment:
+      COGNITO_USER_POOL_ID: !Ref cognitoUserPool
+      COGNITO_CLIENT_ID: !Ref cognitoUserPoolClient
+
+  createNote:
+    handler: handler.createNote
+    environment:
+      NOTES_TABLE_NAME: !Ref notesTable
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - dynamodb:PutItem
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes 
+          method: post 
+          cors: true
+          authorizer: authorizer # This way is with a lambda authorizer function
+  getNotes:
+    handler: handler.getNotes
+    environment:
+      NOTES_TABLE_NAME: !Ref notesTable
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - dynamodb:Scan
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            arn: ${ssm:/notes/${self:provider.stage}/userpoolArn}
+  getNote:
+    handler: handler.getNote
+    environment:
+      NOTES_TABLE_NAME: !Ref notesTable
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - dynamodb:GetItem
+        Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: get
+          cors: true
+          authorizer: authorizer
+  updateNote:
+    handler: handler.updateNote
+    environment:
+      NOTES_TABLE_NAME: !Ref notesTable
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - dynamodb:UpdateItem
+      Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: put
+          cors: true
+          authorizer: authorizer
+  deleteNote:
+    handler: handler.deleteNote
+    environment:
+      NOTES_TABLE_NAME: !Ref notesTable
+      AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - dynamodb:DeleteItem
+      Resource: !GetAtt notesTable.Arn
+    events:
+      - http:
+          path: notes/{id}
+          method: delete
+          cors: true
+          authorizer: authorizer
+  
